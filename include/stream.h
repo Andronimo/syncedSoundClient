@@ -17,6 +17,7 @@ typedef struct stream {
 	pthread_mutex_t mutex;
 } stream_t;
 
+extern void Stream_SetPosition(stream_t* st, uint32 pos);
 extern uint32 Stream_Length(stream_t* st);
 extern uint32 Stream_GetRest(stream_t* st);
 extern uint8 Stream_PutElement(stream_t* st, uint8* data, uint32 length);
