@@ -8,6 +8,7 @@
 
 typedef struct stream {
 	uint32 next;
+	uint32 stepsPerTenMs;
 	uint32 last;
 	uint32 length;
 	uint32 position;
@@ -21,7 +22,7 @@ extern uint32 Stream_GetRest(stream_t* st);
 extern uint8 Stream_PutElement(stream_t* st, uint8* data, uint32 length);
 extern void Stream_Print(stream_t* st);
 extern uint32 Stream_Poll(stream_t* st, uint8* data, uint8 remove);
-extern void Stream_Init(stream_t* st, uint32 length, uint32 startPosition);
+extern void Stream_Init(stream_t* st, uint32 length, uint32 startPosition, uint32 spm);
 extern void Stream_Close(stream_t* st);
 extern uint32 Stream_LengthTop(stream_t* st);
 extern uint8 Stream_Insert(stream_t* st, uint8* data, uint32 length);

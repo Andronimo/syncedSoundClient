@@ -4,11 +4,10 @@
 
 #include <alsa/asoundlib.h>
 #include "stream.h"
-extern int closeCyclic();
-extern void startCyclic(stream_t* stream);
-extern uint32 getPlayingTime(void);
+#include "period.h"
+#include "connection.h"
 
-int main() {
+int main(int argc, char **argv) {
   long loops;
   int rc;
   int size;
@@ -20,7 +19,22 @@ int main() {
   uint8 *buffer;
   stream_t stream;
 
-  Stream_Init(&stream, 10000000, 0);
+  if (argc == 2) {
+	  connection_setServer(argv[1], 2220);
+  } else if (argc == 3) {
+	  int port = atol(argv[2]);
+
+	  if (0u == port) {
+		  printf("Usage: syncedSoundClient server-url [port]\n");
+		  return 1;
+	  }
+	  connection_setServer(argv[1], port);
+  } else {
+	  printf("Usage: syncedSoundClient server-url [port]\n");
+	  return 1;
+  }
+
+  Stream_Init(&stream, 10000000, 0, 410);
 
   startCyclic(&stream);
 
@@ -59,7 +73,7 @@ int main() {
                                   &val, &dir);
 
   /* Set period size to 32 frames. */
-  frames = 32;
+  frames = 512;
   snd_pcm_hw_params_set_period_size_near(handle,
                               params, &frames, &dir);
 
@@ -85,27 +99,25 @@ int main() {
    * period time */
   loops = 50000000 / val;
 
-  while (loops > 0) {
-
+  while (TRUE) {
+	snd_pcm_sframes_t delayFrames;
 	uint32 playingTime;
 	static uint32 lastPlayingTime = 0;
 
-	loops--;
-
-    while (Stream_Length(&stream) < 100000) {
-
+    snd_pcm_delay(handle, &delayFrames);
+    while (Stream_Length(&stream) < 100000 || delayFrames > 44100) {
+    	snd_pcm_delay(handle, &delayFrames);
+    	usleep(1000);
     }
 
     playingTime = getPlayingTime();
 
-	printf("diff: %d\n", playingTime - lastPlayingTime);
-
+    //printf("diff: %d\n", playingTime - lastPlayingTime);
+    //printf("delay cycles %ld\n", delayFrames);
+	//Stream_Seek(&stream, 64); //Hier kann der Stream bei Laufzeitunterscieden angepasst werden
 
     rc = Stream_Pop(&stream, buffer, size);
-
     lastPlayingTime = playingTime;
-
-	// printf("Buffer size: %d read: %d\n", Stream_Length(&stream), rc);
 
     if (rc == 0) {
       fprintf(stderr, "end of file on input\n");

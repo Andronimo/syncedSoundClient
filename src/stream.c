@@ -24,18 +24,23 @@
  * Functions
  *================================================================================*/
 
-void Stream_Init(stream_t* st, uint32 length, uint32 startPosition) {
+void Stream_Init(stream_t* st, uint32 length, uint32 startPosition, uint32 spm) {
 	st->next = 0u;
 	st->last = 0u;
 	st->full= FALSE;
 	st->length = length;
 	st->data = (uint8*) malloc(length);
-	st->position = startPosition;
+	st->position = startPosition * spm;
+	st->stepsPerTenMs = spm;
 	pthread_mutex_init(&st->mutex, NULL);
 }
 
 void Stream_Close(stream_t* st) {
 	free(st->data);
+}
+
+void Stream_SetPosition(stream_t* st, uint32 pos) {
+	st->position = pos * st->stepsPerTenMs;
 }
 
 uint32 Stream_Length(stream_t* st) {
@@ -165,19 +170,23 @@ uint32 Stream_Pop(stream_t* st, uint8* data, uint32 length) {
 
 	if (restToEnd >= length) {
 		memcpy(data, st->data + st->next, length);
-		//pthread_mutex_lock(&st->mutex);
+		pthread_mutex_lock(&st->mutex);
 		st->next += length;
 	} else {
 		memcpy(data, st->data + st->next, restToEnd);
 		memcpy(data + restToEnd, st->data, length - restToEnd);
-		//pthread_mutex_lock(&st->mutex);
+		pthread_mutex_lock(&st->mutex);
 		st->next = length - restToEnd;
 	}
+
+	st->position += length;
+
+	printf("Stream at position: %d:%2d\n", st->position/44100/60/8, (st->position/44100/8) % 60);
 
 	if (length > 0) {
 		st->full = FALSE;
 	}
-	//pthread_mutex_unlock(&st->mutex);
+	pthread_mutex_unlock(&st->mutex);
 
 	return length;
 }

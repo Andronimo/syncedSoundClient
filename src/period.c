@@ -3,10 +3,8 @@
 #include "types.h"
 #include "stream.h"
 #include <unistd.h>
-
-extern int connection_connect(void);
-extern int connection_close(void);
-extern uint32 connection_getTime(void);
+#include "sys/socket.h"
+#include "connection.h"
 
 static uint8 buffer[352800];
 static uint8 cyclic_end = FALSE;
@@ -25,6 +23,7 @@ void *cyclicTask( void *ptr )
 
 	 uint32 time = connection_getTime() / 10 * 10;
 	 playingTime = time;
+	 Stream_SetPosition(stream_p, playingTime);
 
 	 while (TRUE != cyclic_end) {
 

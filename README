@@ -1,0 +1,11 @@
+Zum Kompilieren sollte es reichen make einzugeben. Einzige Abhängigkeiten sind pthread und asound, wobei zweitere ggf. installiert werden muss:
+
+apt install libasound2-dev
+
+Wenn etwas mit den Sourcedateien nicht stimmt hilft ein:
+
+make includes
+
+Die Binary liegt im bin Verzeichnis und kann einfach gestartet werden. Einzige Parameter sind Server und Port. Beispiel:
+
+bin/syncedSoundClient 127.0.0.1 2220

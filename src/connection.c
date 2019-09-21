@@ -3,12 +3,20 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <string.h>
-#define PORT 2220
-
 #include "stream.h"
 #include <stdlib.h>
 
+static int port = 2220;
+static char server_url[16];
 static int sock;
+
+void connection_setServer(char* url, int p) {
+	char safetyBuf[16];
+	memcpy(&safetyBuf[0], url, 15);
+	safetyBuf[15] = 0;
+	strcpy(&server_url[0], safetyBuf);
+	port = p;
+}
 
 int connection_connect()
 {
@@ -16,23 +24,23 @@ int connection_connect()
     struct sockaddr_in serv_addr;
     if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0)
     {
-        printf("\n Socket creation error \n");
+        printf("Socket creation error \n");
         return -1;
     }
 
     serv_addr.sin_family = AF_INET;
-    serv_addr.sin_port = htons(PORT);
+    serv_addr.sin_port = htons(port);
 
     // Convert IPv4 and IPv6 addresses from text to binary form
-    if(inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr)<=0)
+    if(inet_pton(AF_INET, server_url, &serv_addr.sin_addr)<=0)
     {
-        printf("\nInvalid address/ Address not supported \n");
+        printf("Invalid address/ Address not supported \n");
         return -1;
     }
 
     if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
     {
-        printf("\nConnection Failed \n");
+        printf("Connection Failed \n");
         return -1;
     }
 
@@ -54,7 +62,7 @@ uint32 connection_getTime(void) {
 	uint16 time = 1000*tend.tv_sec + (tend.tv_nsec / 1000000) -
 		    1000*tstart.tv_sec - (tstart.tv_nsec / 1000000);
 
-	//printf("sending took about %d milliseconds\n", time);
+	printf("sending took about %d milliseconds\n", time);
 
 	if (num != 13) {
 		return 0;
