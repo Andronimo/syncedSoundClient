@@ -155,7 +155,7 @@ uint8 Stream_Seek(stream_t* st, uint32 length) {
 		st->full = FALSE;
 	}
 
-	printf("Stream at position: %d:%2d\n", st->position/44100/60/8, (st->position/44100/8) % 60);
+	//printf("Stream at position: %d:%2d\n", st->position/44100/60/8, (st->position/44100/8) % 60);
 
 	return E_OK;
 }

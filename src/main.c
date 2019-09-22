@@ -75,9 +75,18 @@ int main(int argc, char **argv) {
                                   &val, &dir);
 
   /* Set period size to 32 frames. */
-  frames = 256;
+  frames = 64;
   snd_pcm_hw_params_set_period_size_near(handle,
                               params, &frames, &dir);
+
+  rc = snd_pcm_hw_params_set_buffer_size(handle,
+                              params, 512);
+  if (rc < 0) {
+    fprintf(stderr,
+            "unable to set buffer size: %s\n",
+            snd_strerror(rc));
+    exit(1);
+  }
 
   /* Write the parameters to the driver */
   rc = snd_pcm_hw_params(handle, params);
@@ -122,7 +131,7 @@ int main(int argc, char **argv) {
 
     //printf("del: %ld length: %d\n", delayFrames, Stream_Length(&stream));
 
-    while (Stream_Length(&stream) < 1000000 || delayFrames > 44100) {
+    while (Stream_Length(&stream) < 1000000 || delayFrames > 88200) {
     	snd_pcm_delay(handle, &delayFrames);
     	usleep(1000);
     }
@@ -146,12 +155,10 @@ int main(int argc, char **argv) {
               "short read: read %d bytes\n", rc);
     }
 
-    if (snd_pcm_avail(handle) > frames) {
-        rc = snd_pcm_writei(handle, buffer, frames);
-        Stream_Seek(&stream, size);
-    } else {
-    	rc = frames;
-    }
+    //printf("%d: avail %ld\n", playingTime, snd_pcm_avail(handle));
+
+    rc = snd_pcm_writei(handle, buffer, frames);
+    Stream_Seek(&stream, size);
 
     if (rc == -EPIPE) {
       /* EPIPE means underrun */
@@ -188,7 +195,17 @@ static int set_swparams(snd_pcm_t *handle, snd_pcm_sw_params_t *swparams)
     }
     /* start the transfer when the buffer is almost full: */
     /* (buffer_size / avail_min) * avail_min */
+    //err = snd_pcm_sw_params_set_avail_min(handle, swparams, 512);
+    //if (err < 0) {
+    //    printf("Unable to set start threshold mode for playback: %s\n", snd_strerror(err));
+    //    return err;
+    //}
     err = snd_pcm_sw_params_set_start_threshold(handle, swparams, 512);
+    if (err < 0) {
+        printf("Unable to set start threshold mode for playback: %s\n", snd_strerror(err));
+        return err;
+    }
+    err = snd_pcm_sw_params_set_stop_threshold(handle, swparams, 2048);
     if (err < 0) {
         printf("Unable to set start threshold mode for playback: %s\n", snd_strerror(err));
         return err;
