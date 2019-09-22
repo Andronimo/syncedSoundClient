@@ -27,7 +27,7 @@ extern void Stream_Init(stream_t* st, uint32 length, uint32 startPosition, uint3
 extern void Stream_Close(stream_t* st);
 extern uint32 Stream_LengthTop(stream_t* st);
 extern uint8 Stream_Insert(stream_t* st, uint8* data, uint32 length);
-extern uint8 Stream_Get(stream_t* st, uint8* data, uint32 length);
+extern uint32 Stream_Get(stream_t* st, uint8* data, uint32 length);
 extern uint32 Stream_Pop(stream_t* st, uint8* data, uint32 length);
 extern uint8 Stream_Seek(stream_t* st, uint32 length);
 

@@ -7,6 +7,8 @@
 #include "period.h"
 #include "connection.h"
 
+static int set_swparams(snd_pcm_t *handle, snd_pcm_sw_params_t *swparams);
+
 int main(int argc, char **argv) {
   long loops;
   int rc;
@@ -73,7 +75,7 @@ int main(int argc, char **argv) {
                                   &val, &dir);
 
   /* Set period size to 32 frames. */
-  frames = 512;
+  frames = 256;
   snd_pcm_hw_params_set_period_size_near(handle,
                               params, &frames, &dir);
 
@@ -89,6 +91,14 @@ int main(int argc, char **argv) {
   /* Use a buffer large enough to hold one period */
   snd_pcm_hw_params_get_period_size(params, &frames,
                                     &dir);
+
+  snd_pcm_sw_params_t * sw_params;
+  snd_pcm_sw_params_alloca(&sw_params);
+  if ((rc = set_swparams(handle, sw_params)) < 0) {
+          printf("Setting of swparams failed: %s\n", snd_strerror(rc));
+          exit(EXIT_FAILURE);
+  }
+
   size = frames * 4; /* 2 bytes/sample, 2 channels */
   buffer = (uint8 *) malloc(size);
 
@@ -99,16 +109,25 @@ int main(int argc, char **argv) {
    * period time */
   loops = 50000000 / val;
 
+  snd_output_t* out;
+  snd_output_stdio_attach(&out, stderr, 0);
+  snd_pcm_dump_sw_setup(handle, out);
+
   while (TRUE) {
 	snd_pcm_sframes_t delayFrames;
 	uint32 playingTime;
 	static uint32 lastPlayingTime = 0;
 
     snd_pcm_delay(handle, &delayFrames);
-    while (Stream_Length(&stream) < 100000 || delayFrames > 44100) {
+
+    //printf("del: %ld length: %d\n", delayFrames, Stream_Length(&stream));
+
+    while (Stream_Length(&stream) < 1000000 || delayFrames > 44100) {
     	snd_pcm_delay(handle, &delayFrames);
     	usleep(1000);
     }
+
+    time_t ads;
 
     playingTime = getPlayingTime();
 
@@ -116,7 +135,7 @@ int main(int argc, char **argv) {
     //printf("delay cycles %ld\n", delayFrames);
 	//Stream_Seek(&stream, 64); //Hier kann der Stream bei Laufzeitunterscieden angepasst werden
 
-    rc = Stream_Pop(&stream, buffer, size);
+    rc = Stream_Get(&stream, buffer, size);
     lastPlayingTime = playingTime;
 
     if (rc == 0) {
@@ -127,7 +146,13 @@ int main(int argc, char **argv) {
               "short read: read %d bytes\n", rc);
     }
 
-    rc = snd_pcm_writei(handle, buffer, frames);
+    if (snd_pcm_avail(handle) > frames) {
+        rc = snd_pcm_writei(handle, buffer, frames);
+        Stream_Seek(&stream, size);
+    } else {
+    	rc = frames;
+    }
+
     if (rc == -EPIPE) {
       /* EPIPE means underrun */
       fprintf(stderr, "underrun occurred\n");
@@ -150,4 +175,30 @@ int main(int argc, char **argv) {
   Stream_Close(&stream);
 
   return 0;
+}
+
+static int set_swparams(snd_pcm_t *handle, snd_pcm_sw_params_t *swparams)
+{
+    int err;
+    /* get the current swparams */
+    err = snd_pcm_sw_params_current(handle, swparams);
+    if (err < 0) {
+        printf("Unable to determine current swparams for playback: %s\n", snd_strerror(err));
+        return err;
+    }
+    /* start the transfer when the buffer is almost full: */
+    /* (buffer_size / avail_min) * avail_min */
+    err = snd_pcm_sw_params_set_start_threshold(handle, swparams, 512);
+    if (err < 0) {
+        printf("Unable to set start threshold mode for playback: %s\n", snd_strerror(err));
+        return err;
+    }
+
+    /* write the parameters to the playback device */
+    err = snd_pcm_sw_params(handle, swparams);
+    if (err < 0) {
+        printf("Unable to set sw params for playback: %s\n", snd_strerror(err));
+        return err;
+    }
+    return 0;
 }

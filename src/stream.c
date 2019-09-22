@@ -155,6 +155,8 @@ uint8 Stream_Seek(stream_t* st, uint32 length) {
 		st->full = FALSE;
 	}
 
+	printf("Stream at position: %d:%2d\n", st->position/44100/60/8, (st->position/44100/8) % 60);
+
 	return E_OK;
 }
 
@@ -191,7 +193,7 @@ uint32 Stream_Pop(stream_t* st, uint8* data, uint32 length) {
 	return length;
 }
 
-uint8 Stream_Get(stream_t* st, uint8* data, uint32 length) {
+uint32 Stream_Get(stream_t* st, uint8* data, uint32 length) {
 
 	uint32 restToEnd = st->length - st->next;
 	uint32 maxData = Stream_Length(st);
