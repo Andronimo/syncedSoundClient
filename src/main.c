@@ -6,6 +6,7 @@
 #include "stream.h"
 #include "period.h"
 #include "connection.h"
+#include "bigint.h"
 
 static int set_swparams(snd_pcm_t *handle, snd_pcm_sw_params_t *swparams);
 
@@ -20,6 +21,8 @@ int main(int argc, char **argv) {
   snd_pcm_uframes_t frames;
   uint8 *buffer;
   stream_t stream;
+
+  bigint_test();
 
   if (argc == 2) {
 	  connection_setServer(argv[1], 2220);
@@ -109,9 +112,9 @@ int main(int argc, char **argv) {
    * period time */
   loops = 50000000 / val;
 
-  snd_output_t* out;
-  snd_output_stdio_attach(&out, stderr, 0);
-  snd_pcm_dump_sw_setup(handle, out);
+  //snd_output_t* out;
+  //snd_output_stdio_attach(&out, stderr, 0);
+  //snd_pcm_dump_sw_setup(handle, out);
 
   while (TRUE) {
 	snd_pcm_sframes_t delayFrames;
@@ -131,7 +134,10 @@ int main(int argc, char **argv) {
 
     playingTime = getPlayingTime();
 
-    //printf("diff: %d\n", playingTime - lastPlayingTime);
+	//printf("Stream at soll: %d:%2d\n", playingTime/1000/60, (playingTime/1000) % 60);
+	//printf("Stream at ist: %d:%2d\n", stream.position/44100/60/8, (stream.position/44100/8) % 60);
+
+    //printf("diff: %d\n", playingTime - stream.position / stream.stepsPerTenMs * 10);
     //printf("delay cycles %ld\n", delayFrames);
 	//Stream_Seek(&stream, 64); //Hier kann der Stream bei Laufzeitunterscieden angepasst werden
 

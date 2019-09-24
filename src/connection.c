@@ -62,7 +62,7 @@ uint32 connection_getTime(void) {
 	uint16 time = 1000*tend.tv_sec + (tend.tv_nsec / 1000000) -
 		    1000*tstart.tv_sec - (tstart.tv_nsec / 1000000);
 
-	printf("sending took about %d milliseconds\n", time);
+	//printf("sending took about %d milliseconds\n", time);
 
 	if (num != 13) {
 		return 0;

@@ -40,7 +40,12 @@ void Stream_Close(stream_t* st) {
 }
 
 void Stream_SetPosition(stream_t* st, uint32 pos) {
-	st->position = pos * st->stepsPerTenMs;
+	st->position = pos * st->stepsPerTenMs / 10;
+
+	printf("Roh: %d:%d\n", pos, st->stepsPerTenMs);
+
+	printf("Stream at soll: %d:%2d\n", pos/1000/60, (pos/1000) % 60);
+	printf("Stream at ist: %d:%2d\n", st->position/44100/60, (st->position/44100) % 60);
 }
 
 uint32 Stream_Length(stream_t* st) {
@@ -108,8 +113,6 @@ uint8 Stream_Insert(stream_t* st, uint8* data, uint32 length) {
 		st->full = TRUE;
 	}
 
-	st->position += length;
-
 	pthread_mutex_unlock(&st->mutex);
 
 	return E_OK;
@@ -155,7 +158,9 @@ uint8 Stream_Seek(stream_t* st, uint32 length) {
 		st->full = FALSE;
 	}
 
-	printf("Stream at position: %d:%2d\n", st->position/44100/60/8, (st->position/44100/8) % 60);
+	st->position += length;
+
+	//printf("Stream at position: %d:%2d\n", st->position/44100/60/8, (st->position/44100/8) % 60);
 
 	return E_OK;
 }
@@ -168,7 +173,6 @@ uint32 Stream_Pop(stream_t* st, uint8* data, uint32 length) {
 	if (maxData < length) {
 		length = maxData;
 	}
-
 
 	if (restToEnd >= length) {
 		memcpy(data, st->data + st->next, length);
