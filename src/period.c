@@ -36,7 +36,6 @@ void *cyclicTask( void *ptr )
 		 } else if (currentTime < syncTime) {
 			  waitTime++;
 		 }
-		 printf("waittime: %d\n", waitTime);
 
 		 syncTime = currentTime;
 

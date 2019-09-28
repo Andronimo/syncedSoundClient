@@ -151,11 +151,10 @@ int main(int argc, char **argv) {
 
     if (sollZeit >= istZeit) {
     	uint32 vorZeit = sollZeit - istZeit;
-        printf("Stream ist %d hinterher\n", vorZeit);
         vorZeit -= (vorZeit % 4u);
 
-        if (TRUE == firstStart) {
-        	printf("Korrigiere %d\n", vorZeit);
+        if (TRUE == firstStart || vorZeit > 20000) {
+        	printf("Korrigiere Vorlauf %d\n", vorZeit);
         	Stream_Seek(&stream, vorZeit);
 			firstStart = FALSE;
 		}
@@ -165,7 +164,12 @@ int main(int argc, char **argv) {
         }
     } else {
     	uint32 hintZeit = istZeit - sollZeit;
-    	printf("Stream ist %d vorneweg\n", hintZeit);
+
+    	if (TRUE == firstStart || hintZeit > 20000) {
+			printf("Korrigiere Nachlauf %d\n", hintZeit);
+			Stream_Rewind(&stream, hintZeit);
+			firstStart = FALSE;
+		}
     }
 
     rc = Stream_Get(&stream, buffer, size);
