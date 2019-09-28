@@ -47,28 +47,39 @@ int connection_connect()
     return sock;
 }
 
-uint32 connection_getTime(void) {
+uint32 connection_getTime(uint32 oldTime) {
+	char oldbuf[16];
 	sint8 buf[14];
 	buf[13] = 0;
 
 	struct timespec tstart={0,0}, tend={0,0};
 	clock_gettime(CLOCK_MONOTONIC, &tstart);
 
-	send(sock , "TIME\n" , 5 , 0 );
+	sprintf(buf, "TIME%010u\n", oldTime);
+	send(sock , buf , 15 , 0 );
 	uint8 num = read(sock, buf, 13);
+	buf[13] = 0;
 
 	clock_gettime(CLOCK_MONOTONIC, &tend);
 
-	uint16 time = 1000*tend.tv_sec + (tend.tv_nsec / 1000000) -
+	uint32 sendingTime = 1000*tend.tv_sec + (tend.tv_nsec / 1000000) -
 		    1000*tstart.tv_sec - (tstart.tv_nsec / 1000000);
 
-	//printf("sending took about %d milliseconds\n", time);
+	uint32 newTime = atol(&buf[0]);
+
+	if (oldTime > 0) {
+		newTime += sendingTime;
+	} else {
+		newTime += sendingTime/2;
+	}
+
+	//printf("%d + %d = %d\n", oldTime, sendingTime, newTime);
 
 	if (num != 13) {
 		return 0;
 	}
 
-	return atol(&buf[0]) - (time / 2);
+	return newTime;
 }
 
 void connection_close() {

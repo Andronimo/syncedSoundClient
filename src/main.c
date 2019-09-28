@@ -85,7 +85,7 @@ int main(int argc, char **argv) {
 
   // Probably needed for embedded device
   rc = snd_pcm_hw_params_set_buffer_size(handle,
-                              params, 4096);
+                              params, framesll);
   if (rc < 0) {
     fprintf(stderr,
             "unable to set buffer size: %s\n",
@@ -156,7 +156,7 @@ int main(int argc, char **argv) {
     snd_pcm_delay(handle, &delayFrames);
     istZeit -= delayFrames*4;
         	
-    //printf("Ãt = %d\n", sollZeit-istZeit);
+    //printf("ï¿½t = %d\n", playingTime);// sollZeit-istZeit);
 
     if (sollZeit >= istZeit) {
     	uint32 vorZeit = sollZeit - istZeit;
