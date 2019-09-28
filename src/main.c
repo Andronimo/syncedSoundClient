@@ -118,6 +118,7 @@ int main(int argc, char **argv) {
   //snd_output_t* out;
   //snd_output_stdio_attach(&out, stderr, 0);
   //snd_pcm_dump_sw_setup(handle, out);
+  static uint8 firstStart = TRUE;
   static bigint_t lastPlayingTime;
   bigint_init(&lastPlayingTime, 0u);
 
@@ -133,6 +134,7 @@ int main(int argc, char **argv) {
     	snd_pcm_delay(handle, &delayFrames);
     	usleep(1000);
     }
+    //printf("Buffer hat %d bytes\n", Stream_Length(&stream));
 
     time_t ads;
 
@@ -143,28 +145,49 @@ int main(int argc, char **argv) {
 
     //printf("diff: %d\n", playingTime - stream.position / stream.stepsPerTenMs * 10);
     //printf("delay cycles %ld\n", delayFrames);
-	//Stream_Seek(&stream, 64); //Hier kann der Stream bei Laufzeitunterscieden angepasst werden
 
     char out[30], out2[30], out3[30];
-    bigint_t temp, temp2;
-    bigint_clone(&temp, &playingTime);
-    bigint_multUint32(&temp, 441*4);
-    bigint_divUint32(&temp, 10);
-    bigint_toString(&temp, &out[0]);
+    bigint_t sollZeit, istZeit, delayBytes;
+    bigint_clone(&sollZeit, &playingTime);
+    bigint_multUint32(&sollZeit, 441*4);
+    bigint_divUint32(&sollZeit, 10);
+    bigint_toString(&sollZeit, &out[0]);
     bigint_toString(&stream.position, &out2[0]);
 
-    bigint_clone(&temp2, &stream.position);
-    if (bigint_greatherThan(&temp, &temp2, TRUE)) {
-    	bigint_sub(&temp, &temp2);
-    	bigint_toString(&temp, &out3[0]);
+    bigint_clone(&istZeit, &stream.position);
+
+    snd_pcm_delay(handle, &delayFrames);
+    bigint_init(&delayBytes, delayFrames);
+    bigint_multUint32(&delayBytes, 4u);
+    bigint_sub(&istZeit, &delayBytes);
+
+    if (bigint_greatherThan(&sollZeit, &istZeit, TRUE)) {
+    	bigint_sub(&sollZeit, &istZeit);
+    	bigint_toString(&sollZeit, &out3[0]);
+        printf("Stream ist %s hinterher\n", &out3[0]);
+        uint32 korr = bigint_toUint32(&sollZeit);
+        korr -= (korr % 4u);
+
+        if (TRUE == firstStart) {
+        	//printf("Korrigiere %d\n", korr);
+        	Stream_Seek(&stream, korr); //Hier kann der Stream bei Laufzeitunterscieden angepasst werden
+			firstStart = FALSE;
+		}
+
+        if (korr > 1000u) {
+        	Stream_Seek(&stream, 64); //Hier kann der Stream bei Laufzeitunterscieden angepasst werden
+        }
     } else {
-    	bigint_sub(&temp2, &temp);
-    	bigint_toString(&temp2, &out3[0]);
+    	bigint_sub(&istZeit, &sollZeit);
+    	bigint_toString(&istZeit, &out3[0]);
+
+        printf("Stream ist %s vorneweg\n", &out3[0]);
     }
+
 
     //printf("Stream is at position: %s\n", &out2[0]);
     //printf("Stream should be at  : %s\n", &out[0]);
-    printf("diff  : %s\n", &out3[0]);
+
 
     rc = Stream_Get(&stream, buffer, size);
     bigint_clone(&lastPlayingTime, &playingTime);

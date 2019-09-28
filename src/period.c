@@ -28,6 +28,7 @@ void *cyclicTask( void *ptr )
 
 	 bigint_divUint32(&syncTime, 10u);
 	 bigint_multUint32(&syncTime, 10u);
+	 bigint_addUint32(&syncTime, 500u);
 	 Stream_SetPosition(stream_p, &syncTime);
 
 	 time = bigint_toUint32(&syncTime);
