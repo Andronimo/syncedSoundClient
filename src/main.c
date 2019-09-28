@@ -75,19 +75,23 @@ int main(int argc, char **argv) {
                                   &val, &dir);
 
   /* Set period size to 32 frames. */
-  frames = 64;
+  frames = 512;
   snd_pcm_hw_params_set_period_size_near(handle,
                               params, &frames, &dir);
+  
+  snd_pcm_uframes_t framesll;
+  snd_pcm_hw_params_get_buffer_size_max(params, &framesll);
+  //printf("max: %d\n", framesll);
 
   // Probably needed for embedded device
-  //rc = snd_pcm_hw_params_set_buffer_size(handle,
-  //                            params, 512);
-  //if (rc < 0) {
-  //  fprintf(stderr,
-  //          "unable to set buffer size: %s\n",
-  //          snd_strerror(rc));
-  //  exit(1);
-  //}
+  rc = snd_pcm_hw_params_set_buffer_size(handle,
+                              params, 4096);
+  if (rc < 0) {
+    fprintf(stderr,
+            "unable to set buffer size: %s\n",
+            snd_strerror(rc));
+    exit(1);
+  }
 
   /* Write the parameters to the driver */
   rc = snd_pcm_hw_params(handle, params);
@@ -146,30 +150,40 @@ int main(int argc, char **argv) {
     uint32 sollZeit = playingTime*441*4/10;
     uint32 istZeit = stream.position;
 
+    //printf("soll: %d, ist: %d\n", sollZeit, istZeit);
+    //printf("length %d, delay %ld, avail: %d, state: %d\n", Stream_Length(&stream), delayFrames, snd_pcm_avail(handle), snd_pcm_state(handle));
+
     snd_pcm_delay(handle, &delayFrames);
     istZeit -= delayFrames*4;
+        	
+    //printf("Ãt = %d\n", sollZeit-istZeit);
 
     if (sollZeit >= istZeit) {
     	uint32 vorZeit = sollZeit - istZeit;
         vorZeit -= (vorZeit % 4u);
 
-        if (TRUE == firstStart || vorZeit > 20000) {
+        if (TRUE == firstStart) {
         	printf("Korrigiere Vorlauf %d\n", vorZeit);
         	Stream_Seek(&stream, vorZeit);
 			firstStart = FALSE;
-		}
+	}
 
         if (vorZeit > 1000u) {
         	Stream_Seek(&stream, 64);
         }
     } else {
     	uint32 hintZeit = istZeit - sollZeit;
+	hintZeit -= (hintZeit % 4u);
 
-    	if (TRUE == firstStart || hintZeit > 20000) {
-			printf("Korrigiere Nachlauf %d\n", hintZeit);
-			Stream_Rewind(&stream, hintZeit);
-			firstStart = FALSE;
-		}
+    	if (TRUE == firstStart) {
+		printf("Korrigiere Nachlauf %d\n", hintZeit);
+		Stream_Rewind(&stream, hintZeit);
+		firstStart = FALSE;
+	}
+
+        if (hintZeit > 1000u) {
+        //	Stream_Rewind(&stream, 64);
+        }
     }
 
     rc = Stream_Get(&stream, buffer, size);
@@ -185,8 +199,21 @@ int main(int argc, char **argv) {
 
     //printf("%d: avail %ld\n", playingTime, snd_pcm_avail(handle));
 
-    rc = snd_pcm_writei(handle, buffer, frames);
-    Stream_Seek(&stream, size);
+    uint32 newFrames = snd_pcm_avail(handle); 
+    if (newFrames > frames) {
+	
+        //printf("try %d frames.....  ", frames);
+    	rc = snd_pcm_writei(handle, buffer, frames);
+    	Stream_Seek(&stream, size);
+    } else {
+	if (newFrames < 60) {
+	     newFrames = 0u;
+	}
+	//printf("try %d frames.....  ", newFrames);
+    	rc = snd_pcm_writei(handle, buffer, newFrames );
+    	Stream_Seek(&stream, newFrames*4);
+    }
+    //printf("wrote %d\n", rc);
 
     if (rc == -EPIPE) {
       /* EPIPE means underrun */
@@ -196,7 +223,7 @@ int main(int argc, char **argv) {
       fprintf(stderr,
               "error from writei: %s\n",
               snd_strerror(rc));
-    }  else if (rc != (int)frames) {
+    }  else if (rc != (int)frames && newFrames > 0u) {
       fprintf(stderr,
               "short write, write %d frames\n", rc);
     }
@@ -228,12 +255,12 @@ static int set_swparams(snd_pcm_t *handle, snd_pcm_sw_params_t *swparams)
     //    printf("Unable to set start threshold mode for playback: %s\n", snd_strerror(err));
     //    return err;
     //}
-    err = snd_pcm_sw_params_set_start_threshold(handle, swparams, 512);
+    err = snd_pcm_sw_params_set_start_threshold(handle, swparams, 1024);
     if (err < 0) {
         printf("Unable to set start threshold mode for playback: %s\n", snd_strerror(err));
         return err;
     }
-    err = snd_pcm_sw_params_set_stop_threshold(handle, swparams, 2048);
+    err = snd_pcm_sw_params_set_stop_threshold(handle, swparams, 2000000);
     if (err < 0) {
         printf("Unable to set start threshold mode for playback: %s\n", snd_strerror(err));
         return err;
