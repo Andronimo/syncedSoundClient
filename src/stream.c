@@ -24,13 +24,15 @@
  * Functions
  *================================================================================*/
 
-void Stream_Init(stream_t* st, uint32 length, uint32 startPosition, uint32 spm) {
+void Stream_Init(stream_t* st, uint32 length, bigint_t* startPosition, uint32 spm) {
 	st->next = 0u;
 	st->last = 0u;
 	st->full= FALSE;
 	st->length = length;
 	st->data = (uint8*) malloc(length);
-	st->position = startPosition * spm;
+	bigint_clone(&st->position, startPosition);
+	bigint_multUint32(&st->position, spm);
+	bigint_print(&st->position);
 	st->stepsPerTenMs = spm;
 	pthread_mutex_init(&st->mutex, NULL);
 }
@@ -39,13 +41,10 @@ void Stream_Close(stream_t* st) {
 	free(st->data);
 }
 
-void Stream_SetPosition(stream_t* st, uint32 pos) {
-	st->position = pos * st->stepsPerTenMs / 10;
-
-	printf("Roh: %d:%d\n", pos, st->stepsPerTenMs);
-
-	printf("Stream at soll: %d:%2d\n", pos/1000/60, (pos/1000) % 60);
-	printf("Stream at ist: %d:%2d\n", st->position/44100/60, (st->position/44100) % 60);
+void Stream_SetPosition(stream_t* st, bigint_t* pos) {
+	bigint_clone(&st->position, pos);
+	bigint_multUint32(&st->position, st->stepsPerTenMs * 4);
+	bigint_divUint32(&st->position, 10u);
 }
 
 uint32 Stream_Length(stream_t* st) {
@@ -158,9 +157,17 @@ uint8 Stream_Seek(stream_t* st, uint32 length) {
 		st->full = FALSE;
 	}
 
-	st->position += length;
+	bigint_addUint32(&st->position, length);
 
-	//printf("Stream at position: %d:%2d\n", st->position/44100/60/8, (st->position/44100/8) % 60);
+//	char out1[20];
+//	bigint_t temp1, temp2;
+//	bigint_clone(&temp1, &st->position);
+//	bigint_divUint32(&temp1, 44100*4);
+//	bigint_clone(&temp2, &temp1);
+//	bigint_divUint32(&temp1, 60u);
+//	bigint_toString(&temp1, &out1[0]);
+
+	//printf("Stream at position: %s:%d\n", &out1[0], bigint_mod(&temp2, 60u));
 
 	return E_OK;
 }
@@ -185,9 +192,8 @@ uint32 Stream_Pop(stream_t* st, uint8* data, uint32 length) {
 		st->next = length - restToEnd;
 	}
 
-	st->position += length;
-
-	printf("Stream at position: %d:%2d\n", st->position/44100/60/8, (st->position/44100/8) % 60);
+	bigint_addUint32(&st->position, length);
+	//printf("Stream at position: %d:%2d\n", st->position/44100/60/8, (st->position/44100/8) % 60);
 
 	if (length > 0) {
 		st->full = FALSE;

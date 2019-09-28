@@ -8,6 +8,6 @@ extern void *cyclicTask( void *ptr );
 extern void *incTime( void *ptr );
 extern void startCyclic(stream_t* stream);
 extern void closeCyclic();
-extern uint32 getPlayingTime();
+extern void getPlayingTime(bigint_t* time);
 
 #endif

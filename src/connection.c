@@ -47,7 +47,7 @@ int connection_connect()
     return sock;
 }
 
-uint32 connection_getTime(void) {
+void connection_getTime(bigint_t* bigint) {
 	sint8 buf[14];
 	buf[13] = 0;
 
@@ -57,18 +57,22 @@ uint32 connection_getTime(void) {
 	send(sock , "TIME\n" , 5 , 0 );
 	uint8 num = read(sock, buf, 13);
 
+	if (BIGINT_OK != bigint_parseString(bigint, buf)) {
+		printf("bad number format, get time...");
+		exit(0);
+	}
+
 	clock_gettime(CLOCK_MONOTONIC, &tend);
 
 	uint16 time = 1000*tend.tv_sec + (tend.tv_nsec / 1000000) -
 		    1000*tstart.tv_sec - (tstart.tv_nsec / 1000000);
 
+	bigint_t temp;
+	bigint_init(&temp, time);
+	bigint_divUint32(&temp, 2u);
+	bigint_sub(bigint, &temp);
+
 	//printf("sending took about %d milliseconds\n", time);
-
-	if (num != 13) {
-		return 0;
-	}
-
-	return atol(&buf[0]) - (time / 2);
 }
 
 void connection_close() {

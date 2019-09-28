@@ -1,6 +1,8 @@
 #include "types.h"
 #include "stdio.h"
 #include "bigint.h"
+#include "stdlib.h"
+#include "time.h"
 
 uint8 bigint_zero(bigint_t* num) {
 	uint8 i;
@@ -27,15 +29,34 @@ uint32 bigint_mod(bigint_t* num, uint32 mod) {
 	return res % mod;
 }
 
+void bigint_toString(bigint_t* num, char* out) {
+	char buf[100];
+	uint8 i,j;
+	bigint_t temp;
+
+	bigint_clone(&temp, num);
+	for (i = 0u; (i < 100) && (FALSE == bigint_zero(&temp)); i++) {
+		buf[i] = 0x30u + bigint_mod(&temp, 10);
+		bigint_divRaw(&temp, 10);
+	}
+
+	for (j = 0; j < i; j++) {
+		out[j] = buf[i-1-j];
+	}
+	out[i] = 0u;
+}
+
 void bigint_print(bigint_t* num) {
 	char buf[100];
 	char out[100];
 	uint8 i,j;
+	bigint_t temp;
+	bigint_clone(&temp, num);
 
-	for (i = 0u; (i < 100) && (FALSE == bigint_zero(num)); i++) {
-		buf[i] = 0x30u + bigint_mod(num, 10);
-		printf("%x %x\n", i , buf[i]);
-		bigint_divRaw(num, 10);
+	for (i = 0u; (i < 100) && (FALSE == bigint_zero(&temp)); i++) {
+		buf[i] = 0x30u + bigint_mod(&temp, 10);
+		//printf("%x %x\n", i , buf[i]);
+		bigint_divRaw(&temp, 10);
 	}
 
 	for (j = 0; j < i; j++) {
@@ -120,44 +141,70 @@ uint8 bigint_greatherThan(bigint_t* b1, bigint_t* b2, uint8 equal) {
 	return equal;
 }
 
+uint8 bigint_greatherThanShift(bigint_t* b1, bigint_t* b2, uint8 equal, uint8 shift1, uint8 shift2) {
+	uint8 i;
+
+	for (i = BIGINT_NUMS_SIZE-1; i != 0xffu; i--) {
+                uint8 j, k;
+                
+                if (i - shift1 >= 0) {
+                    j = b1->nums[i - shift1];
+                } else {
+                    j = 0;
+                }
+                
+                if (i - shift2 >= 0) {
+                    k = b2->nums[i - shift2];
+                } else {
+                    k = 0;
+                }
+            
+		if (j > k) {
+			return TRUE;
+		} else if (j < k) {
+			return FALSE;
+		}
+	}
+
+	return equal;
+}
 
 void bigint_div(bigint_t* dividend, bigint_t* divisor)  {
-	uint8 j = BIGINT_NUMS_SIZE-1;
+	uint8 divisorHighCount = BIGINT_NUMS_SIZE-1;
 	uint8 resCount = 0u;
 	uint8 res[BIGINT_NUMS_SIZE];
 	bigint_t result;
 	bigint_init(&result, 0u);
 
-	while (0u == divisor->nums[j] && (j != 0xffu)) j--;
+	while (0u == divisor->nums[divisorHighCount] && (divisorHighCount != 0xffu)) divisorHighCount--;
 
 	while (bigint_greatherThan(dividend, divisor, TRUE)) {
-		int i = BIGINT_NUMS_SIZE-2;
+		uint8 i = 0u;
+                uint8 shift = TRUE;
 		uint8 probe = 1u;
 		bigint_t bigint_temp, bigint_probe;
 
-		while ((divisor->nums[j] > dividend->nums[i]) && (0u == dividend->nums[i+1]) && (i != 0xffu)) i--;
+		while ((TRUE == shift && (i != 0xffu))) {
+                    shift = bigint_greatherThanShift(dividend, divisor, TRUE, 0, i);
+                    i++;
+                }
+                i-=2;
 
-		uint16 divid = (((uint16) dividend->nums[i+1]) << 8) | dividend->nums[i];
-		probe = (uint8) (divid / divisor->nums[j] / 2);
-		if ((0u == probe) || divisor->nums[j] == dividend->nums[i]) {
+		uint16 divid = (((uint16) dividend->nums[divisorHighCount+i+1]) << 8) | dividend->nums[divisorHighCount+i];
+                probe = (uint8) (divid / (divisor->nums[divisorHighCount]+1));
+		if ((0u == probe) || divisor->nums[divisorHighCount] == dividend->nums[i]) {
 			probe = 1u;
 		}
-		printf("i:%d j:%d %d %d %d\n",i, j, divid, divisor->nums[j], probe);
 
+		/* Probedivision funktioniert nach Konstruktion immer, kann noch verbessert werden*/ 
 		bigint_init(&bigint_probe, probe);
-		bigint_shift(&bigint_probe, i-j);
+		bigint_shift(&bigint_probe, i);
 		bigint_clone(&bigint_temp, divisor);
 		bigint_mult(&bigint_temp, &bigint_probe);
-		bigint_printRaw(&bigint_probe);
 
-		bigint_sub(dividend, &bigint_temp);
+                /* Divisionsteil vom Dividenden abzeiehn und auf Ergebnis addieren*/
+                bigint_sub(dividend, &bigint_temp);
 		bigint_add(&result, &bigint_probe);
-		bigint_printRaw(&bigint_probe);
-
-		//printf("Dividend: ");
-		//bigint_printRaw(dividend);
-		//printf("Divisor:  ");
-		//bigint_printRaw(divisor);
 	}
 
 	bigint_clone(dividend, &result);
@@ -213,20 +260,89 @@ void bigint_printRaw(bigint_t* num) {
 	printf("\n");
 }
 
+uint8 bigint_parseString(bigint_t* bigint, char* num) {
+	uint8 i = 0u;
+	bigint_t base, mult;
+	bigint_init(&base, 1u);
+	bigint_init(bigint, 0u);
+
+	while(num[i] != 0u) {
+		i++;
+		if (i > 20u) {
+			return BIGINT_NUMBER_PARSE_ERROR;
+		}
+	}
+	i--;
+
+	bigint_init(bigint, 0);
+	while (i != 0xff) {
+		if ((num[i] >= 0x30u) && (num[i] <= 0x39u)) {
+			bigint_init(&mult, num[i] - 0x30u);
+			bigint_mult(&mult, &base);
+			bigint_add(bigint, &mult);
+
+			/* Next base 10 */
+			bigint_multSingle(&base, 10u);
+			i--;
+		} else {
+			return BIGINT_NUMBER_PARSE_ERROR;
+		}
+	}
+
+	return BIGINT_OK;
+}
+
+void bigint_addUint32(bigint_t* bigint, uint32 summand) {
+	bigint_t temp;
+	bigint_init(&temp, summand);
+	bigint_add(bigint, &temp);
+}
+
+void bigint_subUint32(bigint_t* bigint, uint32 summand) {
+	bigint_t temp;
+	bigint_init(&temp, summand);
+	bigint_sub(bigint, &temp);
+}
+
+void bigint_divUint32(bigint_t* dividend, uint32 divisor) {
+	bigint_t temp;
+	bigint_init(&temp, divisor);
+	bigint_div(dividend, &temp);
+}
+
+void bigint_multUint32(bigint_t* factor1, uint32 factor2) {
+	bigint_t temp;
+	bigint_init(&temp, factor2);
+	bigint_mult(factor1, &temp);
+}
+
+uint32 bigint_toUint32(bigint_t* bigint) {
+	char out[20];
+	bigint_toString(bigint, &out[0]);
+	return atol(&out[0]);
+}
+
 void bigint_test() {
 	bigint_t test, test2;
-	bigint_init(&test, 145678911);
-	bigint_init(&test2, 123123);
+        uint32 i = 0;
+        uint8 ok = TRUE;
+        char out[20];
+        srand(time(0));
+        
+        for (i = 1; i < 100; i++) {
+            uint32 res;
+            uint32 testDividend;
+            testDividend = rand()*10000+rand();
+            bigint_init(&test, testDividend);
+            bigint_init(&test2, i);
+            bigint_div(&test, &test2);
+            bigint_toString(&test, &out[0]);
+            res = atol(&out[0]);
+            if (testDividend/i != res) {
+                ok = FALSE;
+            }
+        }
 
-	bigint_printRaw(&test);
-	bigint_printRaw(&test2);
-    printf("\n");
-
-	bigint_div(&test, &test2);
-
-	bigint_printRaw(&test);
-
-
-	//bigint_print(&test);
+	printf("bigint test: %d\n", ok);
 }
 

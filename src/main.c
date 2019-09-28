@@ -21,6 +21,7 @@ int main(int argc, char **argv) {
   snd_pcm_uframes_t frames;
   uint8 *buffer;
   stream_t stream;
+  bigint_t test;
 
   bigint_test();
 
@@ -39,7 +40,9 @@ int main(int argc, char **argv) {
 	  return 1;
   }
 
-  Stream_Init(&stream, 10000000, 0, 410);
+  bigint_t zero;
+  bigint_init(&zero, 0u);
+  Stream_Init(&stream, 10000000, &zero, 441);
 
   startCyclic(&stream);
 
@@ -115,11 +118,12 @@ int main(int argc, char **argv) {
   //snd_output_t* out;
   //snd_output_stdio_attach(&out, stderr, 0);
   //snd_pcm_dump_sw_setup(handle, out);
+  static bigint_t lastPlayingTime;
+  bigint_init(&lastPlayingTime, 0u);
 
   while (TRUE) {
 	snd_pcm_sframes_t delayFrames;
-	uint32 playingTime;
-	static uint32 lastPlayingTime = 0;
+	bigint_t playingTime;
 
     snd_pcm_delay(handle, &delayFrames);
 
@@ -132,7 +136,7 @@ int main(int argc, char **argv) {
 
     time_t ads;
 
-    playingTime = getPlayingTime();
+    getPlayingTime(&playingTime);
 
 	//printf("Stream at soll: %d:%2d\n", playingTime/1000/60, (playingTime/1000) % 60);
 	//printf("Stream at ist: %d:%2d\n", stream.position/44100/60/8, (stream.position/44100/8) % 60);
@@ -141,8 +145,29 @@ int main(int argc, char **argv) {
     //printf("delay cycles %ld\n", delayFrames);
 	//Stream_Seek(&stream, 64); //Hier kann der Stream bei Laufzeitunterscieden angepasst werden
 
+    char out[30], out2[30], out3[30];
+    bigint_t temp, temp2;
+    bigint_clone(&temp, &playingTime);
+    bigint_multUint32(&temp, 441*4);
+    bigint_divUint32(&temp, 10);
+    bigint_toString(&temp, &out[0]);
+    bigint_toString(&stream.position, &out2[0]);
+
+    bigint_clone(&temp2, &stream.position);
+    if (bigint_greatherThan(&temp, &temp2, TRUE)) {
+    	bigint_sub(&temp, &temp2);
+    	bigint_toString(&temp, &out3[0]);
+    } else {
+    	bigint_sub(&temp2, &temp);
+    	bigint_toString(&temp2, &out3[0]);
+    }
+
+    //printf("Stream is at position: %s\n", &out2[0]);
+    //printf("Stream should be at  : %s\n", &out[0]);
+    printf("diff  : %s\n", &out3[0]);
+
     rc = Stream_Get(&stream, buffer, size);
-    lastPlayingTime = playingTime;
+    bigint_clone(&lastPlayingTime, &playingTime);
 
     if (rc == 0) {
       fprintf(stderr, "end of file on input\n");

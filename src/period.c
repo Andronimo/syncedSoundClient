@@ -5,30 +5,47 @@
 #include <unistd.h>
 #include "sys/socket.h"
 #include "connection.h"
+#include "bigint.h"
 
 static uint8 buffer[352800];
 static uint8 cyclic_end = FALSE;
 static pthread_t thread1, thread2;
 #define SINGLE_BUFFER_SIZE 88200
 
-static uint32 syncTime;
+static bigint_t syncTime;
+static uint16 waitTime;
 
 void *cyclicTask( void *ptr )
 {
 	 char buf[16];
+	 uint32 time;
 
 	 stream_t * stream_p = (stream_t*) ptr;
 
 	 int sock = connection_connect();
 
-	 uint32 time = connection_getTime() / 10 * 10;
-	 syncTime = time;
-	 Stream_SetPosition(stream_p, syncTime);
+	 connection_getTime(&syncTime);
+
+	 bigint_divUint32(&syncTime, 10u);
+	 bigint_multUint32(&syncTime, 10u);
+	 Stream_SetPosition(stream_p, &syncTime);
+
+	 time = bigint_toUint32(&syncTime);
 
 	 while (TRUE != cyclic_end) {
 
-		 syncTime = connection_getTime();
-
+		 	 	 bigint_t newTime;
+		         connection_getTime(&newTime);
+                 
+                 if (bigint_greatherThan(&newTime, &syncTime, FALSE)) {
+                     waitTime--;
+                 } else if (bigint_greatherThan(&syncTime, &newTime, FALSE)) {
+                     waitTime++;
+                 }
+                 
+                 //printf("diff: %d\n", newTime-syncTime);
+                 
+                 syncTime = newTime;
 
 		 if (Stream_Length(stream_p) < 5000000) {
 
@@ -51,9 +68,11 @@ void *cyclicTask( void *ptr )
 }
 
 void *incTime( void *ptr ) {
+        waitTime = 1000u;
+    
 	while (TRUE != cyclic_end) {
-		syncTime += 1;
-		usleep(935);
+		bigint_addUint32(&syncTime, 1);
+		usleep(waitTime);
 	}
 
 	return 0;
@@ -71,8 +90,8 @@ void closeCyclic() {
 	printf("Stream closed gracefully.");
 }
 
-uint32 getPlayingTime() {
-	return syncTime;
+void getPlayingTime(bigint_t* time) {
+	bigint_clone(time, &syncTime);
 }
 
 
