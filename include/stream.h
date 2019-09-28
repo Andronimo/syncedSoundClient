@@ -30,5 +30,6 @@ extern uint8 Stream_Insert(stream_t* st, uint8* data, uint32 length);
 extern uint32 Stream_Get(stream_t* st, uint8* data, uint32 length);
 extern uint32 Stream_Pop(stream_t* st, uint8* data, uint32 length);
 extern uint8 Stream_Seek(stream_t* st, uint32 length);
+extern uint8 Stream_Rewind(stream_t* st, uint32 length);
 
 #endif /* STREAM_H */

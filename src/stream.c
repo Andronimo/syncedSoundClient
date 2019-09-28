@@ -40,7 +40,7 @@ void Stream_Close(stream_t* st) {
 }
 
 void Stream_SetPosition(stream_t* st, uint32 pos) {
-	st->position = pos * st->stepsPerTenMs;
+	st->position = pos * st->stepsPerTenMs * 4u / 10u;
 }
 
 uint32 Stream_Length(stream_t* st) {
@@ -108,8 +108,6 @@ uint8 Stream_Insert(stream_t* st, uint8* data, uint32 length) {
 		st->full = TRUE;
 	}
 
-	st->position += length;
-
 	pthread_mutex_unlock(&st->mutex);
 
 	return E_OK;
@@ -141,6 +139,24 @@ uint32 Stream_LengthTop(stream_t* st) {
 	return length;
 }
 
+uint8 Stream_Rewind(stream_t* st, uint32 length) {
+
+	uint32 restToStart = st->next;
+
+	if (restToStart >= length) {
+		st->next -= length;
+	} else {
+		st->next = st->length - (length - restToStart);
+	}
+
+	//printf("Rewind -= %d\n", length);
+	st->position -= length;
+
+	//printf("Stream at position: %d:%2d\n", st->position/44100/60/8, (st->position/44100/8) % 60);
+
+	return E_OK;
+}
+
 uint8 Stream_Seek(stream_t* st, uint32 length) {
 
 	uint32 restToEnd = st->length - st->next;
@@ -154,6 +170,9 @@ uint8 Stream_Seek(stream_t* st, uint32 length) {
 	if (length > 0) {
 		st->full = FALSE;
 	}
+
+	//printf("Seek += %d\n", length);
+	st->position += length;
 
 	//printf("Stream at position: %d:%2d\n", st->position/44100/60/8, (st->position/44100/8) % 60);
 

@@ -36,7 +36,7 @@ int main(int argc, char **argv) {
 	  return 1;
   }
 
-  Stream_Init(&stream, 10000000, 0, 410);
+  Stream_Init(&stream, 10000000, 0, 441);
 
   startCyclic(&stream);
 
@@ -79,14 +79,15 @@ int main(int argc, char **argv) {
   snd_pcm_hw_params_set_period_size_near(handle,
                               params, &frames, &dir);
 
-  rc = snd_pcm_hw_params_set_buffer_size(handle,
-                              params, 512);
-  if (rc < 0) {
-    fprintf(stderr,
-            "unable to set buffer size: %s\n",
-            snd_strerror(rc));
-    exit(1);
-  }
+  // Probably needed for embedded device
+  //rc = snd_pcm_hw_params_set_buffer_size(handle,
+  //                            params, 512);
+  //if (rc < 0) {
+  //  fprintf(stderr,
+  //          "unable to set buffer size: %s\n",
+  //          snd_strerror(rc));
+  //  exit(1);
+  //}
 
   /* Write the parameters to the driver */
   rc = snd_pcm_hw_params(handle, params);
@@ -122,6 +123,8 @@ int main(int argc, char **argv) {
   snd_output_stdio_attach(&out, stderr, 0);
   snd_pcm_dump_sw_setup(handle, out);
 
+  uint8 firstStart = TRUE;
+
   while (TRUE) {
 	snd_pcm_sframes_t delayFrames;
 	uint32 playingTime;
@@ -140,9 +143,30 @@ int main(int argc, char **argv) {
 
     playingTime = getPlayingTime();
 
-    //printf("diff: %d\n", playingTime - lastPlayingTime);
-    //printf("delay cycles %ld\n", delayFrames);
-	//Stream_Seek(&stream, 64); //Hier kann der Stream bei Laufzeitunterscieden angepasst werden
+    uint32 sollZeit = playingTime*441*4/10;
+    uint32 istZeit = stream.position;
+
+    snd_pcm_delay(handle, &delayFrames);
+    istZeit -= delayFrames*4;
+
+    if (sollZeit >= istZeit) {
+    	uint32 vorZeit = sollZeit - istZeit;
+        printf("Stream ist %d hinterher\n", vorZeit);
+        vorZeit -= (vorZeit % 4u);
+
+        if (TRUE == firstStart) {
+        	printf("Korrigiere %d\n", vorZeit);
+        	Stream_Seek(&stream, vorZeit);
+			firstStart = FALSE;
+		}
+
+        if (vorZeit > 1000u) {
+        	Stream_Seek(&stream, 64);
+        }
+    } else {
+    	uint32 hintZeit = istZeit - sollZeit;
+    	printf("Stream ist %d vorneweg\n", hintZeit);
+    }
 
     rc = Stream_Get(&stream, buffer, size);
     lastPlayingTime = playingTime;

@@ -11,7 +11,9 @@ static uint8 cyclic_end = FALSE;
 static pthread_t thread1, thread2;
 #define SINGLE_BUFFER_SIZE 88200
 
-static uint32 playingTime;
+static uint32 syncTime;
+static uint32 waitTime = 935u;
+
 
 void *cyclicTask( void *ptr )
 {
@@ -21,15 +23,22 @@ void *cyclicTask( void *ptr )
 
 	 int sock = connection_connect();
 
-	 uint32 time = connection_getTime() / 10 * 10;
-	 playingTime = time;
-	 Stream_SetPosition(stream_p, playingTime);
+	 uint32 time = (connection_getTime() / 10u * 10u) + 000u;
+	 syncTime = time;
+	 Stream_SetPosition(stream_p, syncTime);
 
 	 while (TRUE != cyclic_end) {
 
 		 uint32 currentTime = connection_getTime();
 
-		 playingTime = currentTime;
+		 if (currentTime > syncTime) {
+			  waitTime--;
+		 } else if (currentTime < syncTime) {
+			  waitTime++;
+		 }
+		 printf("waittime: %d\n", waitTime);
+
+		 syncTime = currentTime;
 
 		 if (Stream_Length(stream_p) < 5000000) {
 
@@ -52,9 +61,11 @@ void *cyclicTask( void *ptr )
 }
 
 void *incTime( void *ptr ) {
+
 	while (TRUE != cyclic_end) {
-		playingTime += 1;
-		usleep(935);
+		syncTime += 1;
+		//printf("inc += %d\n", 441 * 4 / 10);
+		usleep(waitTime);
 	}
 
 	return 0;
@@ -73,7 +84,7 @@ void closeCyclic() {
 }
 
 uint32 getPlayingTime() {
-	return playingTime;
+	return syncTime;
 }
 
 
